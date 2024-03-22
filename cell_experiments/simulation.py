@@ -4,6 +4,7 @@ from typing import Callable
 from multiprocessing import Pool
 
 """
+python 3.10
 A script that, given the number of iterations, the number of cells, and the number of barcode in the sets, 
 compute the probability of having two different cells with the same label.
 
@@ -40,10 +41,18 @@ def validate_args(args: list[str]) -> tuple[int, list[int], int]:
     return n_sims, zones, n_cells
 
 # Define probability events
-def probability_events(cell_values: list[int]) -> list[bool]:
-    
-    return [2 in cell_values] # the even that specifies that there is at least one occurrence of exactly two cells having the same label
- 
+def probability_events_2(cell_values: list[int]) -> list[bool]:
+    return [2 in cell_values]
+def probability_events_01mill(cell_values: list[int]) -> list[bool]:
+    return [cell_values.count(2)/num_cells > 0.0001]
+def probability_events_1mill(cell_values: list[int]) -> list[bool]:
+    return [cell_values.count(2)/num_cells > 0.001]
+def probability_events_1cent(cell_values: list[int]) -> list[bool]:
+    return [cell_values.count(2)/num_cells > 0.01]
+def probability_events_10cent(cell_values: list[int]) -> list[bool]:
+    return [cell_values.count(2)/num_cells > 0.1]
+    # return [2 in cell_values] # the even that specifies that there is at least one occurrence of exactly two cells having the same label
+
     # Another example: return [cell_values.count(2) == 1, len(set(cell_values).intersection({1, 2})) == 2, len(set(cell_values)) == 2]
     # The above are 2 events: the first ensures that there is exactly one occurrence of two cells having the same label
     # while the second and third ensure that at most two cells have the same label
@@ -70,13 +79,28 @@ if __name__ == '__main__':
     
     # Create Factory
     myFactory = factory.Factory(zones)
-
     start_sim_time = time.time()
 
     # Simulation in parallel (uses all available threads)
     with Pool() as pool:
-        results = pool.starmap(run_experiment, [(myFactory, num_cells, probability_events)] * simulations)
+        results_2 = pool.starmap(run_experiment, [(myFactory, num_cells, probability_events_2)] * simulations)
+        results_01mill = pool.starmap(run_experiment, [(myFactory, num_cells, probability_events_01mill)] * simulations)
+        results_1mill = pool.starmap(run_experiment, [(myFactory, num_cells, probability_events_1mill)] * simulations)
+        results_1cent = pool.starmap(run_experiment, [(myFactory, num_cells, probability_events_1cent)] * simulations)
+        results_10cent = pool.starmap(run_experiment, [(myFactory, num_cells, probability_events_10cent)] * simulations)
 
-    collisions = sum(results)
+    collisions = sum(results_2)
 
-    print(f"\nCollisions:\t\t\t{collisions}\nProbability:\t\t\t{collisions / simulations}\t* probability of having at least one event with duplicated labelling\nElapsed time:\t\t\t{round(time.time() - start_sim_time, 2)} seconds.")
+    # print(f"\nCollisions:\t\t\t{collisions}\nProbability:\t\t\t{collisions / simulations}\t* probability of having at least one event with duplicated labelling\nElapsed time:\t\t\t{round(time.time() - start_sim_time, 2)} seconds.")
+    print(f"""\n
+          Collisions:\t\t\t{sum(results_2)}\n
+          Probability:\t\t\t{sum(results_2) / simulations}\t* probability of having at least one event with duplicated labelling\n
+          Collisions:\t\t\t{sum(results_01mill)}\n
+          Probability:\t\t\t{sum(results_01mill) / simulations}\t* probability of having more than 0.1‰ of cells with duplicated labelling\n
+          Collisions:\t\t\t{sum(results_1mill)}\n
+          Probability:\t\t\t{sum(results_1mill) / simulations}\t* probability of having more than 1‰ of cells with duplicated labelling\n
+          Collisions:\t\t\t{sum(results_1cent)}\n
+          Probability:\t\t\t{sum(results_1cent) / simulations}\t* probability of having more than 1% of cells with duplicated labelling\n
+          Collisions:\t\t\t{sum(results_10cent)}\n
+          Probability:\t\t\t{sum(results_10cent) / simulations}\t* probability of having more than 10% of cells with duplicated labelling\n
+          Elapsed time:\t\t\t{round(time.time() - start_sim_time, 2)} seconds.""")
